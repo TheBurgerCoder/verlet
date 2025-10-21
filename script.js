@@ -384,3 +384,81 @@ fileInput.addEventListener("change",e=>{
     reader.onload=ev=>importAll(ev.target.result);
     reader.readAsText(file);
 });
+// === Arrow Key Controls ===
+function moveOrCreateWithArrow(e) {
+    const key = e.code;
+    if (!["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(key)) return;
+
+    e.preventDefault();
+
+    const dx = (key === "ArrowLeft" ? -1 : key === "ArrowRight" ? 1 : 0);
+    const dy = (key === "ArrowUp" ? -1 : key === "ArrowDown" ? 1 : 0);
+    const step = 5;
+    const gridSize = 25;
+
+    // EDIT MODE BEHAVIOR
+    if (mode === "edit") {
+        if (e.ctrlKey && e.shiftKey && selectedParticle) {
+            // Ctrl+Shift+Arrow: create + connect
+            const newPos = snapGrid(
+                selectedParticle.position.x + dx * gridSize,
+                selectedParticle.position.y + dy * gridSize
+            );
+            const newP = createParticle(newPos.x, newPos.y);
+            if (newP) {
+                createStick(selectedParticle, newP);
+                selectedParticle.selected = false;
+                selectedParticle = newP;
+                selectedParticle.selected = true;
+            }
+            return;
+        }
+
+        if (e.ctrlKey) {
+            // Ctrl+Arrow: create new point at nearest grid
+            const base = selectedParticle
+                ? selectedParticle.position
+                : { x: canvas.width / 2, y: canvas.height / 2 };
+            const newPos = snapGrid(base.x + dx * gridSize, base.y + dy * gridSize);
+            const newP = createParticle(newPos.x, newPos.y);
+            if (newP) {
+                if (selectedParticle) selectedParticle.selected = false;
+                selectedParticle = newP;
+                selectedParticle.selected = true;
+            }
+            return;
+        }
+
+        // Normal move logic
+        const moveSelected = selectedParticle ? [selectedParticle] : particles;
+        for (const p of moveSelected) {
+            if (e.shiftKey) {
+                // Shift: snap to nearest grid line in that direction
+                if (dx !== 0) {
+                    p.position.x = Math.round(p.position.x / gridSize) * gridSize + dx * gridSize;
+                }
+                if (dy !== 0) {
+                    p.position.y = Math.round(p.position.y / gridSize) * gridSize + dy * gridSize;
+                }
+            } else {
+                // Normal 5px move
+                p.position.x += dx * step;
+                p.position.y += dy * step;
+            }
+        }
+    }
+
+    // SIM MODE BEHAVIOR
+    else if (mode === "sim") {
+        const forceAmount = 50;
+        const fx = dx * forceAmount;
+        const fy = dy * forceAmount;
+        if (selectedParticle) {
+            selectedParticle.applyForce(fx, fy);
+        } else {
+            for (const p of particles) p.applyForce(fx, fy);
+        }
+    }
+}
+
+window.addEventListener("keydown", moveOrCreateWithArrow);
